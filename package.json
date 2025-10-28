@@ -1,29 +1,31 @@
 {
-  "name": "hra-kiosk",
-  "version": "0.1.0",
+  "name": "ipad-hra",
   "private": true,
+  "version": "0.0.0",
+  "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "vite --host",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview --host"
   },
   "dependencies": {
+    "@zxing/browser": "^0.1.5",
+    "dexie": "^4.0.4",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
-    "react-router-dom": "^6.14.1",
-    "dexie": "^3.2.4",
-    "zxing-js/browser": "^0.0.10",
-    "react-signature-canvas": "^1.0.6"
+    "react-router-dom": "^6.22.3"
   },
   "devDependencies": {
-    "typescript": "^5.0.4",
-    "@vitejs/plugin-react": "^4.0.0",
-    "@types/react": "^18.2.3",
-    "@types/react-dom": "^18.2.3",
-    "vite": "^4.3.9",
-    "vite-plugin-pwa": "^0.14.0",
-    "tailwindcss": "^3.2.7",
-    "postcss": "^8.4.21",
-    "autoprefixer": "^10.4.14"
+    "@types/react": "^18.2.15",
+    "@types/react-dom": "^18.2.7",
+    "@vitejs/plugin-react": "^5.1.0",
+    "autoprefixer": "^10.4.16",
+    "postcss": "^8.4.31",
+    "tailwindcss": "^3.3.5",
+    "typescript": "^5.3.3",
+    "vite": "^5.0.8"
+  },
+  "engines": {
+    "node": ">=18"
   }
 }
