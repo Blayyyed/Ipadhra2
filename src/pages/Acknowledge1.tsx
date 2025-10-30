@@ -14,10 +14,12 @@ const Acknowledge: React.FC = () => {
             Before entering a High Radiation Area, I acknowledge:
           </p>
           <ol className="list-decimal pl-6 space-y-2 text-slate-800">
-            <li>I have a valid RWP for this work.</li>
-            <li>I understand the work scope and the hazards in the area.</li>
-            <li>I know the expected dose for this task.</li>
-            <li>I will follow HRA postings, boundaries, and instructions at all times.</li>
+            <li>Workers must be logged onto an RWP that allows access to the area.</li>
+            <li>Workers must be briefed and knowledgeable of radiological conditions in the work area and travel path.</li>
+            <li>Workers must know their dose estimate. Document expected dose on trip ticket. </li>
+            <li>Workers must only enter areas they have been briefed on.</li>
+            <li>Entry into High Radiation Areas is controlled by Technical Specifications. Failure to comply with these requirements can result in additional worker dose and NRC violations. Personnel are authorized to enter ONLY area(s) briefed on.</li>
+            <li>I understand this alone does not allow access to a HRA without completing the briefing process with RP at the Drywell Control Point.</li>
           </ol>
 
           <div className="pt-4">

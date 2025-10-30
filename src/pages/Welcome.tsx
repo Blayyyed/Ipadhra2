@@ -14,10 +14,10 @@ const Welcome: React.FC = () => {
             It standardizes the steps before your HRA brief so you can focus on the critical details.
           </p>
           <ul className="list-disc pl-6 text-slate-700 space-y-2">
-            <li>Prepare your team for the HRA brief</li>
-            <li>Choose your Drywell elevation</li>
-            <li>Mark your work location on the map</li>
-            <li>Record badge numbers + WO # and required overhead</li>
+            <li>Prepare your team for the HRA brief by acknowelding you understand some of the requirements to enter a High Radiation Area.</li>
+            <li>Choose your Drywell elevation and easily mark where you will be working.</li>
+            <li>Verify your WO dose allows you to reasonably complete your job before showing up for the HRA brief</li>
+            <li>Record badge numbers + WO # and notate if overhead is needed. RP Tech in the field will be able to get overhead data before you show up for the brief in most cases.</li>
           </ul>
           <div className="pt-2">
             {/* ✅ Continue goes to /ack */}
