@@ -1,4 +1,3 @@
-// src/pages/MapSelect.tsx
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { db } from "../db/dexie";
@@ -8,77 +7,104 @@ type Area = {
   id: string;
   name: string;
   elevation?: string;
-  mapPath?: string;
+  mapPath?: string; // can be /maps/*.png or data URL
 };
 
+const CANVAS_MAX_WIDTH = 960;
+
 const MapSelect: React.FC = () => {
+  // ✅ MUST be areaId because route is /map/:areaId
   const { areaId = "" } = useParams();
   const nav = useNavigate();
 
   const [area, setArea] = useState<Area | undefined>(undefined);
+  const [status, setStatus] = useState<"loading" | "ready" | "no-area">("loading");
 
-  // Load from Dexie first, fallback to JSON
+  // Canvas and image refs
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const imgRef = useRef<HTMLImageElement | null>(null);
+
+  // Relative pin position (0..1)
+  const [pin, setPin] = useState<{ x: number; y: number } | null>(null);
+
+  // Overhead controls
+  const [overhead, setOverhead] = useState<"yes" | "no" | null>(null);
+  const [overheadHeight, setOverheadHeight] = useState<string>("");
+
+  // ──────────────────────────────────────────────
+  // Load area: Dexie first, fallback to JSON
+  // ──────────────────────────────────────────────
   useEffect(() => {
     let active = true;
-    (async () => {
-      const fromDb = await db.areas.get(String(areaId));
-      if (active && fromDb) {
-        setArea({
-          id: fromDb.id,
-          name: fromDb.name,
-          elevation: (fromDb as any).elevation,
-          mapPath: (fromDb as any).mapPath,
-        });
-        return;
+
+    const load = async () => {
+      setStatus("loading");
+      try {
+        const fromDb = await db.areas.get(String(areaId));
+        if (active && fromDb) {
+          setArea({
+            id: fromDb.id,
+            name: fromDb.name,
+            elevation: (fromDb as any).elevation,
+            mapPath: (fromDb as any).mapPath,
+          });
+          setStatus("ready");
+          return;
+        }
+        // fallback to static JSON
+        const fromJson = (areasJson as Area[]).find(
+          (a) => String(a.id) === String(areaId)
+        );
+        if (active && fromJson) {
+          setArea(fromJson);
+          setStatus("ready");
+          return;
+        }
+
+        if (active) {
+          setArea(undefined);
+          setStatus("no-area");
+        }
+      } catch {
+        if (active) {
+          setArea(undefined);
+          setStatus("no-area");
+        }
       }
-      // fallback to JSON
-      const fromJson = (areasJson as Area[]).find(
-        (a) => String(a.id) === String(areaId)
-      );
-      if (active) setArea(fromJson);
-    })();
+    };
+
+    load();
     return () => {
       active = false;
     };
   }, [areaId]);
 
-  // Canvas + image
-  const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const imgRef = useRef<HTMLImageElement | null>(null);
+  // Compute final image path for drawing
+  const imagePath = useMemo(() => {
+    if (!area) return "/maps/dw-misc.png";
+    const src = area.mapPath || "/maps/dw-misc.png";
+    if (src.startsWith("data:")) return src; // data URL from Update Maps
+    if (src.startsWith("/maps/")) return src; // already in public root
+    return `/maps/${src.replace(/^\/+/, "")}`;
+  }, [area]);
 
-  // pin + overhead
-  const [pin, setPin] = useState<{ x: number; y: number } | null>(null);
-  const [overhead, setOverhead] = useState<"yes" | "no" | null>(null);
-  const [overheadHeight, setOverheadHeight] = useState<string>("");
-
-  // Load image and draw
-  useEffect(() => {
-    if (!area) return;
-    const img = new Image();
-    img.crossOrigin = "anonymous";
-    img.onload = () => {
-      imgRef.current = img;
-      draw();
-    };
-    img.src = area.mapPath || "/maps/placeholder.svg";
-  }, [area?.mapPath]);
-
-  useEffect(() => {
-    draw();
-  }, [pin]);
-
+  // ──────────────────────────────────────────────
+  // Draw image (and pin) whenever image/pin changes
+  // ──────────────────────────────────────────────
   const draw = () => {
     const canvas = canvasRef.current;
+    if (!canvas) return;
+
     const img = imgRef.current;
-    if (!canvas || !img) return;
+    if (!img) return;
 
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    const maxW = Math.min(960, window.innerWidth - 48);
-    const scale = maxW / img.width;
-    const w = img.width * scale;
-    const h = img.height * scale;
+    // Fit width but preserve aspect
+    const scale = Math.min(1, CANVAS_MAX_WIDTH / img.width);
+    const w = Math.floor(img.width * scale);
+    const h = Math.floor(img.height * scale);
 
     canvas.width = w;
     canvas.height = h;
@@ -86,13 +112,14 @@ const MapSelect: React.FC = () => {
     ctx.clearRect(0, 0, w, h);
     ctx.drawImage(img, 0, 0, w, h);
 
+    // Draw pin if set
     if (pin) {
       const px = pin.x * w;
       const py = pin.y * h;
       ctx.save();
       ctx.beginPath();
       ctx.arc(px, py, 6, 0, Math.PI * 2);
-      ctx.fillStyle = "#e11d48";
+      ctx.fillStyle = "#ef4444"; // rose-500
       ctx.fill();
       ctx.lineWidth = 2;
       ctx.strokeStyle = "#7f1d1d";
@@ -101,6 +128,27 @@ const MapSelect: React.FC = () => {
     }
   };
 
+  // Load <img> and draw (initial)
+  useEffect(() => {
+    if (status !== "ready") return;
+
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => {
+      imgRef.current = img;
+      draw();
+    };
+    img.src = imagePath;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [imagePath, status]);
+
+  // Redraw when pin changes (and image already loaded)
+  useEffect(() => {
+    draw();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pin]);
+
+  // Handle map click → store relative coordinates and draw pin
   const onCanvasClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -115,36 +163,29 @@ const MapSelect: React.FC = () => {
   const pinSelected = !!pin;
   const overheadValid =
     overhead === "no" || (overhead === "yes" && overheadHeight.trim() !== "");
-  const ready = !!area && pinSelected && overheadValid;
+  const readyToContinue = status === "ready" && pinSelected && overheadValid;
 
-  const handleContinue = () => {
-    if (!ready || !area) return;
-
+  // Continue → Finalize (snapshot + fields)
+  const onContinue = () => {
     const canvas = canvasRef.current;
-    let dataUrl: string | undefined = undefined;
-    if (canvas) dataUrl = canvas.toDataURL("image/png");
-
+    const snapshot = canvas?.toDataURL("image/png");
     nav(`/final/${areaId}`, {
       state: {
-        areaId: area.id,
-        areaName: area.name,
+        areaId,
+        areaName: area?.name || "Area",
         mapPin: pin,
-        mapSnapshotDataUrl: dataUrl,
+        mapSnapshotDataUrl: snapshot,
         overheadNeeded: overhead === "yes",
-        overheadHeight:
-          overhead === "yes" ? overheadHeight.trim() || null : null,
+        overheadHeight: overhead === "yes" ? overheadHeight.trim() || null : null,
       },
     });
   };
 
-  if (!area) {
+  if (status === "no-area") {
     return (
       <div className="max-w-4xl mx-auto p-6">
-        <h1 className="text-xl font-semibold mb-4">Map Select</h1>
-        <p>Area not found.</p>
-        <Link to="/" className="text-blue-600">
-          Back to Home
-        </Link>
+        <h1 className="k-title text-primary mb-2">Map Select</h1>
+        <p>Area not found. <Link to="/areas" className="k-btn px-4 py-2 ml-2">Back to Areas</Link></p>
       </div>
     );
   }
@@ -152,37 +193,36 @@ const MapSelect: React.FC = () => {
   return (
     <div className="max-w-5xl mx-auto p-6 space-y-6">
       <div className="flex justify-between items-center">
-        <h1 className="text-xl font-semibold">{area.name}</h1>
-        <div className="text-sm flex gap-4">
-          <Link to="/" className="text-blue-600">Back</Link>
-          <Link to="/admin" className="text-blue-600">Admin</Link>
+        <h1 className="k-title text-primary">
+          {status === "ready" ? area?.name : "Loading…"}
+        </h1>
+        <div className="text-sm flex gap-3">
+          <Link to="/areas" className="k-btn px-4 py-2">Back</Link>
+          <Link to="/admin" className="k-btn px-4 py-2">Admin</Link>
         </div>
       </div>
 
-      {/* Map */}
-      <div className="bg-white border rounded p-4">
+      <div className="k-card">
         <canvas
           ref={canvasRef}
           onClick={onCanvasClick}
-          className="w-full rounded border bg-slate-200"
-          style={{ cursor: "crosshair" }}
+          className="w-full bg-slate-200 rounded"
+          style={{ cursor: "crosshair", minHeight: 320 }}
         />
         {!pinSelected && (
           <p className="text-sm text-slate-600 mt-2">
-            Tap your work location on the map to continue.
+            Click on the map to mark your work location.
           </p>
         )}
       </div>
 
-      {/* Overhead */}
-      <div className="bg-white border rounded p-4 space-y-2">
-        <p className="font-medium">Overhead needed?</p>
+      <div className="k-card space-y-2">
+        <p className="font-medium">Overhead required?</p>
         <div className="flex flex-wrap items-center gap-6">
           <label className="inline-flex items-center gap-2">
             <input
               type="radio"
               name="overhead"
-              value="no"
               checked={overhead === "no"}
               onChange={() => {
                 setOverhead("no");
@@ -196,7 +236,6 @@ const MapSelect: React.FC = () => {
             <input
               type="radio"
               name="overhead"
-              value="yes"
               checked={overhead === "yes"}
               onChange={() => setOverhead("yes")}
             />
@@ -214,26 +253,17 @@ const MapSelect: React.FC = () => {
                 value={overheadHeight}
                 onChange={(e) => setOverheadHeight(e.target.value)}
               />
-              <span className="text-sm text-slate-500">ft (approx.)</span>
+              <span className="text-sm text-slate-500">ft</span>
             </div>
           )}
         </div>
-
-        {overhead === "yes" && !overheadHeight && (
-          <p className="text-xs text-rose-600 mt-1">
-            Enter an approximate height.
-          </p>
-        )}
       </div>
 
-      {/* Actions */}
       <div className="flex justify-end">
         <button
-          onClick={handleContinue}
-          disabled={!ready}
-          className={`px-4 py-2 rounded text-white ${
-            ready ? "bg-blue-600 hover:bg-blue-700" : "bg-slate-400"
-          }`}
+          onClick={onContinue}
+          disabled={!readyToContinue}
+          className={`k-btn ${!readyToContinue ? "opacity-60 cursor-not-allowed" : ""}`}
         >
           Continue
         </button>

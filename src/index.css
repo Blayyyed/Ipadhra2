@@ -1,3 +1,26 @@
+/* src/index.css */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* ──────────────────────────────────────────────
+   Kiosk‐friendly defaults
+   ────────────────────────────────────────────── */
+html, body, #root {
+  height: 100%;
+}
+
+body {
+  @apply bg-slate-100 text-slate-800 antialiased;
+}
+
+/* ──────────────────────────────────────────────
+   Reusable UI Classes
+   ────────────────────────────────────────────── */
+
+.k-card { @apply bg-white rounded-lg shadow-card p-6; }
+
+.k-btn { @apply bg-primary text-white rounded-md px-5 py-3 hover:bg-blue-900 transition; }
+
+/* HEADINGS */
+.k-title { @apply text-2xl font-bold; }
